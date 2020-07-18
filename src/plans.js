@@ -55,6 +55,8 @@ function create (schema, version) {
     createVersionTable(schema),
     createJobStateEnum(schema),
     createJobTable(schema),
+    createNotifyTriggerFunction(schema),
+    attachNotifyTriggerFunction(schema),
     cloneJobTableForArchive(schema),
     createScheduleTable(schema),
     addIdIndexToArchive(schema),
@@ -121,6 +123,33 @@ function createJobTable (schema) {
       completedOn timestamp with time zone,
       keepUntil timestamp with time zone NOT NULL default now() + interval '30 days'
     )
+  `
+}
+
+function createNotifyTriggerFunction (schema) {
+  return `
+    CREATE FUNCTION ${schema}.notify_after_job_create()
+      RETURNS trigger
+      LANGUAGE 'plpgsql'
+      COST 100
+      VOLATILE
+    AS $BODY$
+    begin
+      if NEW.startAfter <= now() then
+        PERFORM pg_notify('pgboss', NEW.name);
+      end if;
+      return NULL;
+    end;
+    $BODY$
+  `
+}
+
+function attachNotifyTriggerFunction (schema) {
+  return `
+    CREATE TRIGGER trg_notify_after_job_create
+      AFTER INSERT ON ${schema}.job
+      FOR EACH ROW
+      EXECUTE PROCEDURE ${schema}.notify_after_job_create()
   `
 }
 

@@ -104,7 +104,12 @@ class Manager extends EventEmitter {
       fetch: () => this.fetch(name, options.batchSize || options.teamSize || 1, fetchOptions),
       onFetch: jobs => sendItBruh(jobs),
       onError,
-      interval: options.newJobCheckInterval
+      interval: options.newJobCheckInterval,
+      listen: (handler) => {
+        handler = (n) => (n === name) && handler()
+        this.db.on('job', handler)
+        return () => this.db.off('job', handler)
+      }
     }
 
     const worker = new Worker(workerConfig)
